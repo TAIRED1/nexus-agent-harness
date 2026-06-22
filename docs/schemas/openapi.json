@@ -1,0 +1,259 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nexus Agent Harness — MCP Server REST API",
+    "description": "REST companion API for the Nexus MCP Server. Provides health checks, telemetry buffer access, and server status endpoints. MCP tool invocations use the JSON-RPC 2.0 protocol at /mcp.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Nexus Agent Harness",
+      "url": "https://github.com/nexus/agent-harness"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    { "name": "health", "description": "Server health and liveness checks" },
+    { "name": "telemetry", "description": "Live telemetry buffer access" },
+    { "name": "mcp", "description": "MCP JSON-RPC 2.0 tool invocation endpoint" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["health"],
+        "operationId": "getHealth",
+        "summary": "Server health check",
+        "description": "Returns 200 OK when the server is running. Use this for container liveness/readiness probes.",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "status": "ok",
+                  "service": "nexus-agent-harness",
+                  "version": "1.0.0",
+                  "timestamp": "2026-06-22T05:00:00.000Z",
+                  "uptime": 3600.5
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/buffer": {
+      "get": {
+        "tags": ["telemetry"],
+        "operationId": "getTelemetryBuffer",
+        "summary": "Get buffered telemetry events",
+        "description": "Returns up to the last 200 telemetry events from the in-process ring buffer. Use this as a fallback when WebSocket is unavailable.",
+        "responses": {
+          "200": {
+            "description": "Telemetry events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["events", "count"],
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/TelemetryEvent" }
+                    },
+                    "count": { "type": "integer", "minimum": 0 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": ["mcp"],
+        "operationId": "invokeMcpTool",
+        "summary": "MCP JSON-RPC 2.0 endpoint",
+        "description": "Invoke any registered MCP tool using the JSON-RPC 2.0 protocol. All tool calls, list requests, and capability queries go through this endpoint.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JsonRpcRequest" },
+              "examples": {
+                "list_tools": {
+                  "summary": "List all available tools",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": "req-001",
+                    "method": "tools/list",
+                    "params": {}
+                  }
+                },
+                "execute_command": {
+                  "summary": "Execute a shell command",
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": "req-002",
+                    "method": "tools/call",
+                    "params": {
+                      "name": "execute_command",
+                      "arguments": {
+                        "shellSessionId": "550e8400-e29b-41d4-a716-446655440000",
+                        "command": "ls -la /tmp",
+                        "timeoutMs": 5000,
+                        "captureStderr": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JsonRpcResponse" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RateLimitError" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status", "service", "version", "timestamp", "uptime"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "degraded"] },
+          "service": { "type": "string" },
+          "version": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "uptime": { "type": "number", "description": "Server uptime in seconds" }
+        }
+      },
+      "TelemetryEvent": {
+        "type": "object",
+        "required": ["id", "type", "timestamp", "payload"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "tool_call_started",
+              "tool_call_completed",
+              "tool_call_error",
+              "shell_command_executed",
+              "shell_session_created",
+              "shell_session_terminated",
+              "system_snapshot_captured",
+              "token_burn_threshold_exceeded",
+              "agent_connected",
+              "agent_disconnected"
+            ]
+          },
+          "timestamp": { "type": "integer", "description": "Unix timestamp in milliseconds" },
+          "sessionId": { "type": "string", "nullable": true },
+          "agentId": { "type": "string", "nullable": true },
+          "payload": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "JsonRpcRequest": {
+        "type": "object",
+        "required": ["jsonrpc", "id", "method"],
+        "properties": {
+          "jsonrpc": { "type": "string", "enum": ["2.0"] },
+          "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "method": {
+            "type": "string",
+            "enum": ["tools/list", "tools/call", "initialize", "ping"]
+          },
+          "params": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "JsonRpcResponse": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/JsonRpcSuccessResponse" },
+          { "$ref": "#/components/schemas/JsonRpcErrorResponse" }
+        ]
+      },
+      "JsonRpcSuccessResponse": {
+        "type": "object",
+        "required": ["jsonrpc", "id", "result"],
+        "properties": {
+          "jsonrpc": { "type": "string", "enum": ["2.0"] },
+          "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "result": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "text"],
+                  "properties": {
+                    "type": { "type": "string", "enum": ["text"] },
+                    "text": { "type": "string" }
+                  }
+                }
+              },
+              "isError": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "JsonRpcErrorResponse": {
+        "type": "object",
+        "required": ["jsonrpc", "id", "error"],
+        "properties": {
+          "jsonrpc": { "type": "string", "enum": ["2.0"] },
+          "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }, { "type": "null" }] },
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "integer" },
+              "message": { "type": "string" },
+              "data": { "additionalProperties": true }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "type": "object",
+        "required": ["error", "message", "retryAfter"],
+        "properties": {
+          "error": { "type": "string", "example": "Too Many Requests" },
+          "message": { "type": "string" },
+          "retryAfter": { "type": "integer", "description": "Seconds to wait before retrying" }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "telemetryWebSocket": {
+      "description": "WebSocket stream at ws://localhost:3001/ws/telemetry for live telemetry events."
+    }
+  }
+}

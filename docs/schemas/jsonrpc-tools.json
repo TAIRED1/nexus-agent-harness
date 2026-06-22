@@ -1,0 +1,407 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nexus-agent-harness/schemas/jsonrpc-tools.json",
+  "title": "Nexus MCP Server — JSON-RPC Tool Schemas",
+  "description": "Machine-readable schemas for all MCP tools exposed by the Nexus Agent Harness server.",
+  "version": "1.0.0",
+  "definitions": {
+    "JsonRpcRequest": {
+      "type": "object",
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "type": "string", "const": "2.0" },
+        "id": { "type": ["string", "integer"] },
+        "method": { "type": "string", "const": "tools/call" },
+        "params": {
+          "type": "object",
+          "required": ["name", "arguments"],
+          "properties": {
+            "name": { "type": "string" },
+            "arguments": { "type": "object" }
+          }
+        }
+      }
+    },
+    "ToolCallRecord": {
+      "type": "object",
+      "required": ["id", "sessionId", "toolName", "inputTokens", "outputTokens", "totalTokens", "startedAt", "status"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "sessionId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 },
+        "totalTokens": { "type": "integer", "minimum": 0 },
+        "startedAt": { "type": "integer" },
+        "completedAt": { "type": ["integer", "null"] },
+        "durationMs": { "type": ["integer", "null"] },
+        "status": { "type": "string", "enum": ["pending", "running", "success", "error", "timeout"] },
+        "errorMessage": { "type": ["string", "null"] },
+        "inputSizeBytes": { "type": "integer" },
+        "outputSizeBytes": { "type": "integer" }
+      }
+    },
+    "ShellSession": {
+      "type": "object",
+      "required": ["id", "agentId", "sessionId", "createdAt", "status", "cwd", "shell", "totalCommands"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "agentId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "lastActivity": { "type": "integer" },
+        "status": { "type": "string", "enum": ["idle", "running", "terminated", "error"] },
+        "cwd": { "type": "string" },
+        "shell": { "type": "string" },
+        "totalCommands": { "type": "integer", "minimum": 0 },
+        "environment": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  },
+  "tools": {
+    "system_snapshot": {
+      "name": "system_snapshot",
+      "description": "Capture a comprehensive system health snapshot",
+      "category": "system",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["capturedAt", "cpu", "memory", "disks", "network", "topProcesses", "uptime"],
+        "properties": {
+          "capturedAt": { "type": "integer" },
+          "cpu": {
+            "type": "object",
+            "required": ["brand", "cores", "currentLoad", "userLoad", "systemLoad", "idleLoad"],
+            "properties": {
+              "manufacturer": { "type": "string" },
+              "brand": { "type": "string" },
+              "speed": { "type": "number" },
+              "cores": { "type": "integer" },
+              "physicalCores": { "type": "integer" },
+              "currentLoad": { "type": "number", "minimum": 0, "maximum": 100 },
+              "userLoad": { "type": "number" },
+              "systemLoad": { "type": "number" },
+              "idleLoad": { "type": "number" },
+              "perCoreLoad": { "type": "array", "items": { "type": "number" } }
+            }
+          },
+          "memory": {
+            "type": "object",
+            "required": ["total", "free", "used", "usagePercent"],
+            "properties": {
+              "total": { "type": "integer" },
+              "free": { "type": "integer" },
+              "used": { "type": "integer" },
+              "active": { "type": "integer" },
+              "available": { "type": "integer" },
+              "usagePercent": { "type": "number", "minimum": 0, "maximum": 100 },
+              "swapTotal": { "type": "integer" },
+              "swapUsed": { "type": "integer" },
+              "swapFree": { "type": "integer" }
+            }
+          },
+          "disks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fs": { "type": "string" },
+                "type": { "type": "string" },
+                "size": { "type": "integer" },
+                "used": { "type": "integer" },
+                "available": { "type": "integer" },
+                "usePercent": { "type": "number" },
+                "mount": { "type": "string" }
+              }
+            }
+          },
+          "network": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "iface": { "type": "string" },
+                "rxBytesPerSec": { "type": "number" },
+                "txBytesPerSec": { "type": "number" }
+              }
+            }
+          },
+          "topProcesses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pid": { "type": "integer" },
+                "name": { "type": "string" },
+                "cpu": { "type": "number" },
+                "mem": { "type": "number" },
+                "command": { "type": "string" }
+              }
+            }
+          },
+          "loadAverage": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "uptime": { "type": "number" },
+          "platform": { "type": "string" },
+          "hostname": { "type": "string" },
+          "nodeVersion": { "type": "string" }
+        }
+      }
+    },
+    "cpu_metrics": {
+      "name": "cpu_metrics",
+      "description": "Get real-time CPU load breakdown",
+      "category": "system",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includePerCore": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    "memory_metrics": {
+      "name": "memory_metrics",
+      "description": "Get current memory and swap usage",
+      "category": "system",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    "disk_metrics": {
+      "name": "disk_metrics",
+      "description": "Get filesystem usage for all mounted volumes",
+      "category": "system",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "minSizeGb": { "type": "number", "minimum": 0, "default": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "network_metrics": {
+      "name": "network_metrics",
+      "description": "Get per-interface network I/O rates",
+      "category": "system",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    "process_list": {
+      "name": "process_list",
+      "description": "List the top N processes sorted by CPU, memory, PID, or name",
+      "category": "system",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
+          "sortBy": { "type": "string", "enum": ["cpu", "memory", "pid", "name"], "default": "cpu" },
+          "includeChildren": { "type": "boolean", "default": false }
+        },
+        "additionalProperties": false
+      }
+    },
+    "record_tool_call": {
+      "name": "record_tool_call",
+      "description": "Record a completed tool invocation with token consumption data",
+      "category": "analytics",
+      "inputSchema": {
+        "type": "object",
+        "required": ["sessionId", "agentId", "toolName", "inputTokens", "outputTokens", "durationMs", "status"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 1 },
+          "agentId": { "type": "string", "minLength": 1 },
+          "toolName": { "type": "string", "minLength": 1 },
+          "inputTokens": { "type": "integer", "minimum": 0 },
+          "outputTokens": { "type": "integer", "minimum": 0 },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "status": { "type": "string", "enum": ["success", "error", "timeout"] },
+          "errorMessage": { "type": "string" },
+          "inputSizeBytes": { "type": "integer", "minimum": 0, "default": 0 },
+          "outputSizeBytes": { "type": "integer", "minimum": 0, "default": 0 }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/definitions/ToolCallRecord" }
+    },
+    "get_burn_analytics": {
+      "name": "get_burn_analytics",
+      "description": "Retrieve token burn analytics for a session",
+      "category": "analytics",
+      "inputSchema": {
+        "type": "object",
+        "required": ["sessionId", "agentId"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 1 },
+          "agentId": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["agentId", "sessionId", "lifetimeTotals", "windows", "topTools"],
+        "properties": {
+          "agentId": { "type": "string" },
+          "sessionId": { "type": "string" },
+          "lifetimeTotals": {
+            "type": "object",
+            "properties": {
+              "inputTokens": { "type": "integer" },
+              "outputTokens": { "type": "integer" },
+              "totalTokens": { "type": "integer" },
+              "callCount": { "type": "integer" },
+              "errorCount": { "type": "integer" },
+              "estimatedCostUSD": { "type": "number" }
+            }
+          },
+          "windows": {
+            "type": "object",
+            "properties": {
+              "last1m": { "$ref": "#/definitions/TokenBurnWindow" },
+              "last5m": { "$ref": "#/definitions/TokenBurnWindow" },
+              "last1h": { "$ref": "#/definitions/TokenBurnWindow" }
+            }
+          },
+          "topTools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "toolName": { "type": "string" },
+                "callCount": { "type": "integer" },
+                "totalTokens": { "type": "integer" },
+                "averageDurationMs": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "list_tool_history": {
+      "name": "list_tool_history",
+      "description": "Retrieve paginated tool call history for a session",
+      "category": "analytics",
+      "inputSchema": {
+        "type": "object",
+        "required": ["sessionId"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 1 },
+          "page": { "type": "integer", "minimum": 1, "default": 1 },
+          "pageSize": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+          "toolName": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "running", "success", "error", "timeout"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "reset_session_metrics": {
+      "name": "reset_session_metrics",
+      "description": "Clear all token analytics data for a session",
+      "category": "analytics",
+      "inputSchema": {
+        "type": "object",
+        "required": ["sessionId"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "create_shell_session": {
+      "name": "create_shell_session",
+      "description": "Initialize a new isolated shell session",
+      "category": "shell",
+      "inputSchema": {
+        "type": "object",
+        "required": ["sessionId", "agentId"],
+        "properties": {
+          "sessionId": { "type": "string", "minLength": 1 },
+          "agentId": { "type": "string", "minLength": 1 },
+          "cwd": { "type": "string" },
+          "shell": { "type": "string" },
+          "environment": { "type": "object", "additionalProperties": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/definitions/ShellSession" }
+    },
+    "execute_command": {
+      "name": "execute_command",
+      "description": "Execute a shell command in an existing session",
+      "category": "shell",
+      "inputSchema": {
+        "type": "object",
+        "required": ["shellSessionId", "command"],
+        "properties": {
+          "shellSessionId": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1, "maxLength": 8192 },
+          "timeoutMs": { "type": "integer", "minimum": 100 },
+          "captureStderr": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["commandId", "exitCode", "stdout", "stderr", "durationMs", "timedOut", "truncated"],
+        "properties": {
+          "commandId": { "type": "string" },
+          "exitCode": { "type": "integer" },
+          "stdout": { "type": "string" },
+          "stderr": { "type": "string" },
+          "durationMs": { "type": "integer" },
+          "timedOut": { "type": "boolean" },
+          "truncated": { "type": "boolean" },
+          "sessionId": { "type": "string" }
+        }
+      }
+    },
+    "get_shell_session": {
+      "name": "get_shell_session",
+      "description": "Inspect the state of an existing shell session",
+      "category": "shell",
+      "inputSchema": {
+        "type": "object",
+        "required": ["shellSessionId"],
+        "properties": {
+          "shellSessionId": { "type": "string", "minLength": 1 },
+          "includeHistory": { "type": "boolean", "default": true },
+          "historyLimit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 20 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "terminate_shell_session": {
+      "name": "terminate_shell_session",
+      "description": "Cleanly terminate a shell session",
+      "category": "shell",
+      "inputSchema": {
+        "type": "object",
+        "required": ["shellSessionId"],
+        "properties": {
+          "shellSessionId": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "list_shell_sessions": {
+      "name": "list_shell_sessions",
+      "description": "List all shell sessions for an agent",
+      "category": "shell",
+      "inputSchema": {
+        "type": "object",
+        "required": ["agentId"],
+        "properties": {
+          "agentId": { "type": "string", "minLength": 1 },
+          "statusFilter": { "type": "string", "enum": ["idle", "running", "terminated", "error", "all"], "default": "all" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "server_status": {
+      "name": "server_status",
+      "description": "Get the current Nexus MCP server status",
+      "category": "meta",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  }
+}

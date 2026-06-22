@@ -1,0 +1,1 @@
+{"version":3,"file":"websocket-telemetry.d.ts","sourceRoot":"","sources":["../../src/transport/websocket-telemetry.ts"],"names":[],"mappings":"AAAA;;;;;;;;;;;;;GAaG;AAEH,OAAO,EAAE,eAAe,EAAa,MAAM,IAAI,CAAC;AAChD,OAAO,KAAK,EAAmB,MAAM,IAAI,UAAU,EAAE,MAAM,WAAW,CAAC;AAgDvE,wBAAgB,8BAA8B,CAC5C,UAAU,EAAE,UAAU,GACrB,eAAe,CAsEjB;AAED,wBAAgB,uBAAuB,IAAI,MAAM,CAEhD"}
