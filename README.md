@@ -1,6 +1,6 @@
 # Nexus Agent Harness
 
-> **Production-ready ecosystem for orchestrating autonomous LLM agents via the Model Context Protocol (MCP)**
+> **Production-ready ecosystem for orchestrating autonomous LLM agents via the Model Context Protocol (MCP) by TAIRED**
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-brightgreen)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://typescriptlang.org)
@@ -174,3 +174,4 @@ Key variables:
 ## License
 
 MIT © Nexus Agent Harness
+by TAIRED - Agbaje Joshua 
